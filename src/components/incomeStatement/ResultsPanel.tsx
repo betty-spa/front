@@ -1,107 +1,62 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { Card } from "@/components/ui/card"
-import { API_URL } from "@/lib/enviroments"
-import { fetcher } from "@/lib/fetcher"
+import { IIncomeStatementTotals } from "@/interfaces/reports/IIncomeStatement"
+import { formatCurrency, formatPercent } from "./incomeStatement.utils"
 
-interface FinancialData {
-    periodo: string
-    ventas: number
-    costoVentas: number
-    gastosVenta: number
-    gastosAdministracion: number
-    gastosFinancieros: number
-    otrosIngresos: number
-    impuestos: number
+type ResultsPanelProps = {
+    grossIncome: number
+    averageNet: number
+    totals?: IIncomeStatementTotals
 }
 
-export default function ResultsPanel() {
-    const [data, setData] = useState<FinancialData | null>(null)
-
-    useEffect(() => {
-        let mounted = true
-        const fetchData = async () => {
-            try {
-                const res = await fetcher<FinancialData>(`${API_URL}/home?date=&storeID=`)
-                if (mounted) setData(res)
-            } catch (err) {
-                console.warn("ResultsPanel: error fetching financial data", err)
-                if (mounted) setData(null)
-            }
-        }
-        fetchData()
-        return () => {
-            mounted = false
-        }
-    }, [])
-
-    const periodo = data?.periodo || "-"
-    const ventas = data?.ventas || 0
-    const costoVentas = data?.costoVentas || 0
-    const gastosVenta = data?.gastosVenta || 0
-    const gastosAdministracion = data?.gastosAdministracion || 0
-    const gastosFinancieros = data?.gastosFinancieros || 0
-    const otrosIngresos = data?.otrosIngresos || 0
-    const impuestos = data?.impuestos || 0
-
-    const utilidadBruta = ventas - costoVentas
-    const totalGastosOperacion = gastosVenta + gastosAdministracion + gastosFinancieros
-    const utilidadOperacion = utilidadBruta - totalGastosOperacion
-    const utilidadAntesImpuestos = utilidadOperacion + otrosIngresos
-    const utilidadNeta = utilidadAntesImpuestos - impuestos
-
-    const format = (n: number) => n.toLocaleString("es-MX", { style: "currency", currency: "MXN" })
-
-    const Row = ({ label, value, className = "" }: { label: string; value: string | number; className?: string }) => (
-        <div className={`flex justify-between text-sm ${className}`}>
-            <span>{label}</span>
-            <span className="font-semibold">{typeof value === "number" ? format(value) : value}</span>
-        </div>
-    )
+export default function ResultsPanel({ grossIncome, averageNet, totals }: ResultsPanelProps) {
+    const margin = grossIncome > 0 ? (totals?.net ?? 0) / grossIncome : 0
+    const netDirection = (totals?.net ?? 0) >= 0 ? "positivo" : "negativo"
 
     return (
-        <Card className="bg-white dark:bg-slate-800 rounded-lg shadow-md p-6 h-full flex flex-col space-y-2 text-gray-800 dark:text-white">
-            <h2 className="text-lg font-bold mb-4 text-blue-700 dark:text-blue-400">Estado de Resultados</h2>
+        <Card className="border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <h2 className="text-lg font-semibold text-slate-800 dark:text-white">Resumen</h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Análisis básico</p>
 
-            <Row label="Periodo" value={periodo} />
-            <hr className="my-1 border-gray-300 dark:border-gray-700" />
-
-            <Row label="Ventas" value={ventas} />
-            <Row label="(–) Costo de ventas" value={costoVentas} />
-            <Row label="= Utilidad bruta" value={utilidadBruta} className="text-blue-700 dark:text-blue-300 mt-1" />
-
-            <hr className="my-2 border-gray-300 dark:border-gray-700" />
-            <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mt-1">Gastos de operación</p>
-            <Row label="Gastos de venta" value={gastosVenta} />
-            <Row label="Gastos de administración" value={gastosAdministracion} />
-            <Row label="Gastos financieros" value={gastosFinancieros} />
-            <Row
-                label="Total gastos de operación"
-                value={totalGastosOperacion}
-                className="text-red-600 dark:text-red-400"
-            />
-
-            <Row
-                label="= Utilidad de operación"
-                value={utilidadOperacion}
-                className="text-green-600 dark:text-green-300 mt-2"
-            />
-
-            <hr className="my-2 border-gray-300 dark:border-gray-700" />
-            <Row label="Otros ingresos" value={otrosIngresos} />
-            <Row
-                label="= Utilidad antes de impuestos"
-                value={utilidadAntesImpuestos}
-                className="text-blue-700 dark:text-blue-300"
-            />
-
-            <Row label="(–) Impuestos" value={impuestos} />
-            <Row
-                label="= Utilidad neta"
-                value={utilidadNeta}
-                className="text-indigo-700 dark:text-indigo-300 font-bold text-base mt-2"
-            />
+            <div className="mt-4 space-y-3">
+                <div className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3 dark:bg-slate-800/70">
+                    <span className="text-sm text-slate-600 dark:text-slate-300">Ingreso bruto anual</span>
+                    <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                        {formatCurrency(grossIncome)}
+                    </span>
+                </div>
+                <div className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3 dark:bg-slate-800/70">
+                    <span className="text-sm text-slate-600 dark:text-slate-300">Promedio neto mensual</span>
+                    <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                        {formatCurrency(averageNet)}
+                    </span>
+                </div>
+                <div className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3 dark:bg-slate-800/70">
+                    <span className="text-sm text-slate-600 dark:text-slate-300">Margen neto</span>
+                    <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                        {formatPercent(margin * 100)}
+                    </span>
+                </div>
+                <div className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3 dark:bg-slate-800/70">
+                    <span className="text-sm text-slate-600 dark:text-slate-300">Resultado</span>
+                    <span
+                        className={`text-sm font-semibold ${
+                            netDirection === "positivo"
+                                ? "text-emerald-600 dark:text-emerald-300"
+                                : "text-rose-600 dark:text-rose-300"
+                        }`}
+                    >
+                        {netDirection}
+                    </span>
+                </div>
+                <div className="rounded-xl border border-dashed border-slate-300 px-4 py-3 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                    Neto anual:{" "}
+                    <span className="font-semibold text-slate-900 dark:text-white">
+                        {formatCurrency(totals?.net ?? 0)}
+                    </span>
+                </div>
+            </div>
         </Card>
     )
 }
