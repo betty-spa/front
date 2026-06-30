@@ -335,7 +335,7 @@ export default function Sidebar() {
                                 {!shouldShowCollapsed && (
                                     <Switch
                                         checked={!!isDarkMode}
-                                        onCheckedChange={() => setIsDarkMode(!isDarkMode)}
+                                        onCheckedChange={setIsDarkMode}
                                         className="bg-gray-300 data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-slate-900 flex-shrink-0"
                                     />
                                 )}
