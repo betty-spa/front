@@ -13,15 +13,15 @@ export default function LoginScreen() {
             />
             <div
                 aria-hidden="true"
-                className="absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(11,65,104,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(11,65,104,0.08)_1px,transparent_1px)] [background-size:44px_44px] dark:opacity-20 dark:[background-image:linear-gradient(rgba(255,255,255,0.09)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.09)_1px,transparent_1px)]"
+                className="absolute inset-0 opacity-40 bg-[linear-gradient(rgba(11,65,104,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(11,65,104,0.08)_1px,transparent_1px)] bg-size-[44px_44px] dark:opacity-20 dark:bg-[linear-gradient(rgba(255,255,255,0.09)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.09)_1px,transparent_1px)]"
             />
             <div
                 aria-hidden="true"
-                className="absolute -left-28 top-0 h-full w-[48vw] min-w-[420px] -skew-x-12 bg-[#0f73ac]/12 dark:bg-cyan-400/10"
+                className="absolute -left-28 top-0 h-full w-[48vw] min-w-105 -skew-x-12 bg-[#0f73ac]/12 dark:bg-cyan-400/10"
             />
             <div
                 aria-hidden="true"
-                className="absolute -right-36 bottom-[-18%] h-[58%] w-[52vw] min-w-[460px] -skew-x-12 bg-emerald-400/18 dark:bg-emerald-400/10"
+                className="absolute -right-36 bottom-[-18%] h-[58%] w-[52vw] min-w-115 -skew-x-12 bg-emerald-400/18 dark:bg-emerald-400/10"
             />
             <Image
                 aria-hidden="true"

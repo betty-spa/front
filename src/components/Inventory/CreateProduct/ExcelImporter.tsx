@@ -23,6 +23,8 @@ const REQUIRED_COLUMNS = [
     "Cantidad",
 ]
 
+const normalizeExcelText = (value: unknown) => String(value ?? "").replace(/\s+/g, " ").trim()
+
 function validateExcelRows(rows: any[]): string | null {
     if (!rows.length) return "El archivo está vacío."
     const cols = Object.keys(rows[0])
@@ -30,11 +32,13 @@ function validateExcelRows(rows: any[]): string | null {
         if (!cols.includes(col)) return `Falta la columna obligatoria: ${col}`
     }
     const ALLOW_EMPTY = ["Género", "Marca", "Categoría", "Talla", "Código EAN"]
+    const skuRows = new Map<string, number>()
+
     for (let i = 0; i < rows.length; i++) {
         const row = rows[i]
         for (const col of REQUIRED_COLUMNS) {
             if (ALLOW_EMPTY.includes(col)) continue
-            if (row[col] === undefined || row[col] === null || row[col] === "") {
+            if (normalizeExcelText(row[col]) === "") {
                 return `Fila ${i + 2}: Falta valor en columna "${col}".`
             }
         }
@@ -43,6 +47,15 @@ function validateExcelRows(rows: any[]): string | null {
         }
         if (isNaN(Number(row["Cantidad"]))) {
             return `Fila ${i + 2}: Stock central inválido.`
+        }
+
+        const sku = normalizeExcelText(row["Código EAN"])
+        if (sku) {
+            const previousRow = skuRows.get(sku)
+            if (previousRow) {
+                return `Fila ${i + 2}: Código EAN duplicado (${sku}). Ya aparece en la fila ${previousRow}.`
+            }
+            skuRows.set(sku, i + 2)
         }
     }
     return null
@@ -70,9 +83,9 @@ export function ExcelImporter({ categories }: { categories: ICategory[] }) {
                 const productMap = new Map<string, CreateProductFormData>()
 
                 for (const row of json) {
-                    const genre: Genre = !row["Género"] ? "Unisex" : row["Género"]
-                    const brand: Brand = !row["Marca"] ? "Otro" : row["Marca"]
-                    let categoryName: string = row["Categoría"]?.trim() || "Calzado"
+                    const genre = (normalizeExcelText(row["Género"]) || "Unisex") as Genre
+                    const brand = (normalizeExcelText(row["Marca"]) || "Otro") as Brand
+                    let categoryName = normalizeExcelText(row["Categoría"]) || "Calzado"
                     let catId = findCategoryIdByName(categories, categoryName)
                     if (!catId) {
                         categoryName = "Otro"
@@ -80,15 +93,16 @@ export function ExcelImporter({ categories }: { categories: ICategory[] }) {
                     }
 
                     const defaultImage = ""
-                    const image = row["Imagen"]?.trim() || defaultImage
-                    const productName = row["Producto"].replace(/\s+/g, " ").trim()
+                    const image = normalizeExcelText(row["Imagen"]) || defaultImage
+                    const productName = normalizeExcelText(row["Producto"])
                     const key = `${productName}|${image}|${catId}|${genre}|${brand}`
+                    const sku = normalizeExcelText(row["Código EAN"]) || generateRandomSku()
 
                     const size = {
-                        sizeNumber: String(row["Talla"]),
+                        sizeNumber: normalizeExcelText(row["Talla"]),
                         priceList: Number(row["Precio Plaza"]),
                         priceCost: Number(row["Precio Costo Neto"]),
-                        sku: !!row["Código EAN"] ? row["Código EAN"] : generateRandomSku(),
+                        sku,
                         stockQuantity: Number(row["Cantidad"]),
                         tempId: Math.random().toString(36).substring(7),
                     }

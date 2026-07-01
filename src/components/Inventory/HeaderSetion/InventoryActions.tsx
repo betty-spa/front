@@ -2,12 +2,13 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { IProduct } from "@/interfaces/products/IProduct"
+import type { IProduct } from "@/interfaces/products/IProduct"
+import type { IRawProduct } from "@/interfaces/products/IRawProduct"
 import { exportInventoryToExcel } from "@/utils/exportInventoryToExcel"
 import { Button } from "@/components/ui/button"
 import { CategoryManagementModal } from "@/components/CategorySection/EditCategory/CategoryManagementModal"
 
-export default function InventoryActions({ products }: { products: IProduct[] }) {
+export default function InventoryActions({ products }: { products: Array<IProduct | IRawProduct> }) {
     const router = useRouter()
     const [showCategoryModal, setShowCategoryModal] = useState(false)
     const handleDownloadExcel = () => {

@@ -37,7 +37,7 @@ export default function CreateProductForm({ categories }: { categories: ICategor
         }
 
         startTransition(async () => {
-            const result = await createMassiveProducts({ products })
+            const result = await createMassiveProducts({ products, validateExistingSkus: true })
             if (result.success) {
                 toast.success("Productos guardados correctamente.")
                 router.push("/home/inventory")
