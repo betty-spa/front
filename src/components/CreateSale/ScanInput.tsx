@@ -1,18 +1,38 @@
 "use client"
-import { useSaleStore } from "@/stores/sale.store"
-import { IProduct } from "@/interfaces/products/IProduct"
-import { Input } from "@/components/ui/input"
+
 import { ChangeEvent, KeyboardEvent, useMemo, useState } from "react"
-import { IProductVariation, IStoreProduct } from "@/interfaces/products/IProductVariation"
-import { IVariationWithQuantity } from "@/interfaces/orders/IOrder"
-import { useTienda } from "@/stores/tienda.store"
-import { toast } from "sonner"
-import { getPriceCheck } from "@/actions/pricing/getPriceCheck"
 import { useSearchParams } from "next/navigation"
+import { toast } from "sonner"
+import { Input } from "@/components/ui/input"
+import { getPriceCheck } from "@/actions/pricing/getPriceCheck"
+import { IVariationWithQuantity } from "@/interfaces/orders/IOrder"
+import { IProduct } from "@/interfaces/products/IProduct"
+import { IProductVariation, IStoreProduct } from "@/interfaces/products/IProductVariation"
+import { useSaleStore } from "@/stores/sale.store"
+import { useTienda } from "@/stores/tienda.store"
 
 interface Props {
     initialProducts: IProduct[]
 }
+
+type SearchOption = {
+    product: IProduct
+    variation: IProductVariation
+    storeProduct: IStoreProduct
+    stockQuantity: number
+    searchText: string
+}
+
+const normalizeSearchText = (value: string) =>
+    value
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9\s]/gi, " ")
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+        .trim()
+
+const normalizeSku = (value: string) => value.trim().toLowerCase()
 
 const resolveStoreProductStoreId = (storeProduct: IStoreProduct) =>
     storeProduct.storeID || storeProduct.Store?.storeID
@@ -22,73 +42,139 @@ const findStoreProductForStore = (variation: IProductVariation, storeID: string)
     return variation.StoreProducts?.find((storeProduct) => resolveStoreProductStoreId(storeProduct) === storeID)
 }
 
+const getStoreProductStock = (storeProduct?: IStoreProduct) => {
+    if (!storeProduct) return 0
+    const quantity = Number(storeProduct.quantity)
+    return Number.isFinite(quantity) ? quantity : 0
+}
+
+const buildSearchText = (product: IProduct, variation: IProductVariation) =>
+    normalizeSearchText(
+        [
+            product.name,
+            product.brand,
+            product.Category?.name,
+            product.genre,
+            variation.sku,
+            variation.sizeNumber,
+        ]
+            .filter(Boolean)
+            .join(" "),
+    )
+
 export const ScanInput = ({ initialProducts }: Props) => {
     const { addProduct } = useSaleStore((state) => state.actions)
     const { storeSelected } = useTienda()
     const searchParams = useSearchParams()
     const [productInput, setProductCode] = useState("")
 
-    // Use storeID directly — Zustand may not have the full store object
     const effectiveStoreID = storeSelected?.storeID ?? searchParams.get("storeID") ?? ""
 
-    const parentProductFinded = useMemo(() => {
-        const inputTokens = productInput.toLowerCase().trim().split(/\s+/)
+    const storeOptions = useMemo<SearchOption[]>(() => {
+        if (!Array.isArray(initialProducts) || !effectiveStoreID) return []
 
-        if (!Array.isArray(initialProducts)) return []
+        const options: SearchOption[] = []
 
-        return initialProducts.filter((p) => {
-            const nameTokens = p.name.toLowerCase().split(/\s+/)
+        for (const product of initialProducts) {
+            for (const variation of product.ProductVariations || []) {
+                const storeProduct = findStoreProductForStore(variation, effectiveStoreID)
+                if (!storeProduct) continue
 
-            return inputTokens.every((inputToken) => nameTokens.some((nameToken) => nameToken.includes(inputToken)))
-        })
-    }, [productInput, initialProducts])
+                options.push({
+                    product,
+                    variation,
+                    storeProduct,
+                    stockQuantity: getStoreProductStock(storeProduct),
+                    searchText: buildSearchText(product, variation),
+                })
+            }
+        }
+
+        return options
+    }, [effectiveStoreID, initialProducts])
+
+    const availableOptions = useMemo(
+        () => storeOptions.filter((option) => option.stockQuantity > 0),
+        [storeOptions],
+    )
+
+    const normalizedQuery = useMemo(() => normalizeSearchText(productInput), [productInput])
+
+    const searchResults = useMemo(() => {
+        if (normalizedQuery.length < 2) return []
+
+        const tokens = normalizedQuery.split(" ").filter(Boolean)
+        if (tokens.length === 0) return []
+
+        return availableOptions
+            .filter((option) => tokens.every((token) => option.searchText.includes(token)))
+            .slice(0, 20)
+    }, [availableOptions, normalizedQuery])
+
+    const addSearchOption = async (option: SearchOption) => {
+        const variationWithQuantity: IVariationWithQuantity = {
+            ...option.variation,
+            quantity: 1,
+            stockQuantity: option.stockQuantity,
+        }
+
+        try {
+            const check = await getPriceCheck(option.storeProduct.storeProductID)
+            addProduct(option.product, variationWithQuantity, option.storeProduct, check.finalPrice, check.activeOffer)
+        } catch {
+            addProduct(option.product, variationWithQuantity, option.storeProduct)
+        }
+
+        setProductCode("")
+    }
 
     const handleSetInputValue = (e: ChangeEvent<HTMLInputElement>) => {
-        e.preventDefault()
         setProductCode(e.target.value)
     }
 
     const handleEnterPressed = async (e: KeyboardEvent<HTMLInputElement>) => {
         const isEnterPress = e.key === "Enter" || e.key === "NumpadEnter"
         if (!isEnterPress) return
-        e.preventDefault()
-        const productFinded = initialProducts.find((p) =>
-            p.ProductVariations.some((v) => v.sku === productInput.trim()),
-        )
-        if (!productFinded) {
-            toast.error(`No se encontró sku: ${productInput}`)
-            return
-        }
 
-        const variationFinded = productFinded.ProductVariations.find((v) => v.sku === productInput.trim())
-        if (!variationFinded) return
+        e.preventDefault()
 
         if (!effectiveStoreID) {
             toast.error("No hay tienda seleccionada")
             return
         }
 
-        const storeProduct = findStoreProductForStore(variationFinded, effectiveStoreID)
-        if (!storeProduct) {
-            toast.error("El producto no está asignado a la tienda seleccionada")
+        const query = productInput.trim()
+        if (!query) return
+
+        const exactAssignedSku = storeOptions.find((option) => normalizeSku(option.variation.sku) === normalizeSku(query))
+        if (exactAssignedSku && exactAssignedSku.stockQuantity <= 0) {
+            toast.error("El producto existe, pero no tiene stock en la tienda seleccionada")
             return
         }
 
-        const variationWithQuantity: IVariationWithQuantity = {
-            ...variationFinded,
-            quantity: 1,
-            stockQuantity: storeProduct.quantity,
+        const exactAvailableSku = availableOptions.find(
+            (option) => normalizeSku(option.variation.sku) === normalizeSku(query),
+        )
+        if (exactAvailableSku) {
+            await addSearchOption(exactAvailableSku)
+            return
         }
 
-        try {
-            const check = await getPriceCheck(storeProduct.storeProductID)
-            addProduct(productFinded, variationWithQuantity, storeProduct, check.finalPrice, check.activeOffer)
-        } catch (error) {
-            addProduct(productFinded, variationWithQuantity, storeProduct)
+        if (searchResults.length === 1) {
+            await addSearchOption(searchResults[0])
+            return
         }
 
-        setProductCode("")
+        if (searchResults.length > 1) {
+            toast.message("Selecciona una talla de la lista")
+            return
+        }
+
+        toast.error(`No se encontro producto con stock: ${query}`)
     }
+
+    const shouldShowResults = normalizedQuery.length >= 2 && productInput.trim() !== ""
+
     return (
         <>
             <form
@@ -102,58 +188,39 @@ export const ScanInput = ({ initialProducts }: Props) => {
                     value={productInput}
                     onChange={handleSetInputValue}
                     onKeyDown={handleEnterPressed}
-                    placeholder="Código de producto"
+                    placeholder="Codigo de producto"
                     className="flex-1"
                     autoFocus
                 />
             </form>
-            <div className="relative">
-                <ul className="absolute -top-6 bg-white dark:bg-slate-700 border rounded-lg shadow mt-2 max-h-64 overflow-y-auto z-50">
-                    {productInput.length > 2 &&
-                        productInput !== "" &&
-                        parentProductFinded.map((product) =>
-                            product.ProductVariations.map((variation) => {
-                                const storeProductMatch = findStoreProductForStore(variation, effectiveStoreID)
-                                const variationWithQuantity: IVariationWithQuantity = {
-                                    ...variation,
-                                    quantity: 1,
-                                    stockQuantity: storeProductMatch?.quantity ?? 0,
-                                }
-                                return (
-                                    <li
-                                        key={variation.variationID}
-                                        onClick={async () => {
-                                            if (!effectiveStoreID) {
-                                                toast.error("Selecciona una tienda primero")
-                                                return
-                                            }
-                                            if (!storeProductMatch) {
-                                                toast.error("El producto no está asignado a la tienda seleccionada")
-                                                return
-                                            }
-                                            try {
-                                                const check = await getPriceCheck(storeProductMatch.storeProductID)
-                                                addProduct(
-                                                    product,
-                                                    variationWithQuantity,
-                                                    storeProductMatch,
-                                                    check.finalPrice,
-                                                    check.activeOffer,
-                                                )
-                                            } catch (error) {
-                                                addProduct(product, variationWithQuantity, storeProductMatch)
-                                            }
-                                            setProductCode("")
-                                        }}
-                                        className="p-2 hover:bg-blue-400 cursor-pointer transition"
+            {shouldShowResults && (
+                <div className="relative">
+                    <ul className="absolute -top-6 left-0 w-full max-w-xl bg-white dark:bg-slate-700 border rounded-lg shadow mt-2 max-h-72 overflow-y-auto z-50">
+                        {searchResults.length > 0 ? (
+                            searchResults.map((option) => (
+                                <li key={`${option.product.productID}-${option.variation.variationID}`}>
+                                    <button
+                                        type="button"
+                                        onClick={() => addSearchOption(option)}
+                                        className="w-full p-3 text-left hover:bg-blue-100 dark:hover:bg-slate-600 cursor-pointer transition"
                                     >
-                                        {product.name} - {variation.sizeNumber}
-                                    </li>
-                                )
-                            }),
+                                        <span className="block text-sm font-medium text-slate-900 dark:text-white">
+                                            {option.product.name} - {option.variation.sizeNumber}
+                                        </span>
+                                        <span className="block text-xs text-slate-500 dark:text-slate-300">
+                                            SKU {option.variation.sku} - Stock {option.stockQuantity}
+                                        </span>
+                                    </button>
+                                </li>
+                            ))
+                        ) : (
+                            <li className="p-3 text-sm text-slate-500 dark:text-slate-300">
+                                Sin productos con stock para esta busqueda
+                            </li>
                         )}
-                </ul>
-            </div>
+                    </ul>
+                </div>
+            )}
         </>
     )
 }

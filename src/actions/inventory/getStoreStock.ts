@@ -1,10 +1,11 @@
 import { fetcher } from "@/lib/fetcher"
 import { API_URL } from "@/lib/enviroments"
 import { IStoreProduct } from "@/interfaces/products/IProductVariation"
+import type { IProduct } from "@/interfaces/products/IProduct"
 import type { ICategory } from "@/interfaces/categories/ICategory"
 import type { IStore } from "@/interfaces/stores/IStore"
 import type { IProductVariationRaw, IRawProduct, IStoreProductRaw } from "@/interfaces/products/IRawProduct"
-import { normalizeStoreProductList, type RawStoreProduct } from "@/lib/normalize-product"
+import { normalizeProduct, normalizeStoreProductList, type RawStoreProduct } from "@/lib/normalize-product"
 
 type RawCategoryFromStock = Partial<ICategory> & {
     children?: RawCategoryFromStock[]
@@ -178,4 +179,24 @@ export async function getStoreStock(storeID: string): Promise<IStoreProduct[]> {
 export async function getStoreStockProducts(storeID: string): Promise<IRawProduct[]> {
     const items = await fetcher<RawStoreProductFromStock[]>(`${API_URL}/inventory/store/${storeID}`)
     return Array.isArray(items) ? mapStoreStockToProducts(items, storeID) : []
+}
+
+export async function getStoreStockSaleProducts(storeID: string): Promise<IProduct[]> {
+    const rawProducts = await getStoreStockProducts(storeID)
+
+    return rawProducts
+        .map(normalizeProduct)
+        .map((product) => {
+            const ProductVariations = product.ProductVariations.filter((variation) => {
+                const storeProduct = variation.StoreProducts?.find((item) => item.storeID === storeID)
+                return (storeProduct?.quantity ?? 0) > 0
+            })
+
+            return {
+                ...product,
+                ProductVariations,
+                stock: ProductVariations.reduce((sum, variation) => sum + variation.stockQuantity, 0),
+            }
+        })
+        .filter((product) => product.ProductVariations.length > 0)
 }
