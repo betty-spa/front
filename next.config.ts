@@ -18,6 +18,10 @@ const nextConfig: NextConfig = {
             },
             {
                 protocol: "https",
+                hostname: "*.desi.cl",
+            },
+            {
+                protocol: "https",
                 hostname: "*.bing.com",
             },
             {

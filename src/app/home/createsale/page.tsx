@@ -1,11 +1,35 @@
 import { getAllProducts } from "@/actions/products/getAllProducts"
+import { getStoreStockSaleProducts } from "@/actions/inventory/getStoreStock"
 import { SaleForm } from "@/components/CreateSale/SaleForm"
 
 import { Suspense } from "react"
 export const revalidate = 0
 
-const CreateSale = async () => {
-    const [productsData] = await Promise.all([getAllProducts()])
+type CreateSaleProps = {
+    searchParams?: Promise<{ storeID?: string | string[] }>
+}
+
+const SPECIAL_STORE_FILTERS = new Set(["all", "propias", "consignadas"])
+
+const parseParam = (value?: string | string[]) => (Array.isArray(value) ? value[0] : value)
+
+const getProductsForSale = async (storeID?: string) => {
+    if (storeID && !SPECIAL_STORE_FILTERS.has(storeID)) {
+        try {
+            return await getStoreStockSaleProducts(storeID)
+        } catch (error) {
+            console.warn("CreateSale: fallback to full products after store stock error:", error)
+        }
+    }
+
+    return getAllProducts()
+}
+
+const CreateSale = async ({ searchParams }: CreateSaleProps) => {
+    const resolvedSearchParams = await searchParams
+    const storeID = parseParam(resolvedSearchParams?.storeID)
+    const [productsData] = await Promise.all([getProductsForSale(storeID)])
+
     return (
         <main className="min-h-screen p-4">
             <div className="max-w-4xl mx-auto dark:bg-slate-800 bg-white shadow-xl rounded-2xl p-6">

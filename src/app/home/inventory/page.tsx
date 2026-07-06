@@ -1,12 +1,36 @@
 import { getInventoryProducts } from "@/actions/products/getInventoryProducts"
+import { getStoreStockProducts } from "@/actions/inventory/getStoreStock"
 import { getAllCategories } from "@/actions/categories/getAllCategories"
 import { getAllStores } from "@/actions/stores/getAllStores"
 import InventoryClientWrapper from "@/components/Inventory/InventoryClientWrapper"
 
-export default async function InventoryPage() {
+type InventoryPageProps = {
+    searchParams?: Promise<{ storeID?: string | string[] }>
+}
+
+const SPECIAL_STORE_FILTERS = new Set(["all", "propias", "consignadas"])
+
+const parseParam = (value?: string | string[]) => (Array.isArray(value) ? value[0] : value)
+
+const getInventoryData = async (storeID?: string) => {
+    if (storeID && !SPECIAL_STORE_FILTERS.has(storeID)) {
+        try {
+            return await getStoreStockProducts(storeID)
+        } catch (error) {
+            console.warn("InventoryPage: fallback to full products after store stock error:", error)
+        }
+    }
+
+    return getInventoryProducts()
+}
+
+export default async function InventoryPage({ searchParams }: InventoryPageProps) {
+    const resolvedSearchParams = await searchParams
+    const storeID = parseParam(resolvedSearchParams?.storeID)
+
     // Lógica de obtención en servidor
     const [productsData, categoriesData, storesData] = await Promise.all([
-        getInventoryProducts(),
+        getInventoryData(storeID),
         getAllCategories(),
         getAllStores(),
     ])

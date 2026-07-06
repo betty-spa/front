@@ -10,11 +10,21 @@ import { createMassiveProducts } from "@/actions/products/createMassiveProducts"
 import { ExcelImporter } from "./ExcelImporter"
 import { ProductCard } from "./ProductCard"
 import type { ICategory } from "@/interfaces/categories/ICategory"
+import { useTienda } from "@/stores/tienda.store"
 
-export default function CreateProductForm({ categories }: { categories: ICategory[] }) {
+export default function CreateProductForm({
+    categories,
+    initialStoreID,
+}: {
+    categories: ICategory[]
+    initialStoreID?: string
+}) {
     const router = useRouter()
+    const { storeSelected } = useTienda()
     const [isPending, startTransition] = useTransition()
     const { products, errors, addProduct, setProducts, resetForm } = useProductFormStore()
+    const storeID = initialStoreID ?? storeSelected?.storeID
+    const inventoryRoute = storeID ? `/home/inventory?storeID=${storeID}` : "/home/inventory"
 
     useEffect(() => {
         return () => {
@@ -40,7 +50,7 @@ export default function CreateProductForm({ categories }: { categories: ICategor
             const result = await createMassiveProducts({ products, validateExistingSkus: true })
             if (result.success) {
                 toast.success("Productos guardados correctamente.")
-                router.push("/home/inventory")
+                router.push(inventoryRoute)
             } else {
                 toast.error(result.error || "Error al guardar productos.")
             }
@@ -63,7 +73,7 @@ export default function CreateProductForm({ categories }: { categories: ICategor
                 <div className="mb-8">
                     <div className="flex items-center gap-4 mb-6">
                         <Button
-                            onClick={() => router.push("/home/inventory")}
+                            onClick={() => router.push(inventoryRoute)}
                             className="flex items-center gap-2 px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white bg-white dark:bg-slate-900 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 border border-gray-200 dark:border-slate-700"
                         >
                             <ArrowLeft className="w-4 h-4" />

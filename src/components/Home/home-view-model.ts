@@ -1,4 +1,5 @@
 import { getAllProducts } from "@/actions/products/getAllProducts"
+import { getStoreStockSaleProducts } from "@/actions/inventory/getStoreStock"
 import { getAllPurchaseOrders } from "@/actions/purchase-orders/getAllPurchaseOrders"
 import { getSales, getSalesForResume } from "@/actions/sales/getSales"
 import { getAllStores } from "@/actions/stores/getAllStores"
@@ -12,6 +13,18 @@ import { getChileYYYYMMDD, isYYYYMMDD, toChileMiddayUTC } from "@/utils/chile-da
 import { mapWooOrderToSale } from "@/utils/mappers/woocommerceToSale"
 
 const isSpecialStoreFilter = (storeID: string) => ["all", "propias", "consignadas"].includes(storeID)
+
+const getProductsForSale = async (storeID: string) => {
+    if (!isSpecialStoreFilter(storeID)) {
+        try {
+            return await getStoreStockSaleProducts(storeID)
+        } catch (error) {
+            console.warn("buildHomeViewModel: fallback to full products after store stock error:", error)
+        }
+    }
+
+    return getAllProducts()
+}
 
 type HomeTableItem = ISaleResponse | (IPurchaseOrder & { isOrder: true })
 
@@ -67,7 +80,7 @@ export type HomeViewModel = {
     allSalesForResume: ISaleResponse[]
     purchaseOrders: (IPurchaseOrder & { isOrder: true })[]
     items: HomeTableItem[]
-    allProducts: Awaited<ReturnType<typeof getAllProducts>>
+    allProducts: Awaited<ReturnType<typeof getProductsForSale>>
     dateRef: Date
 }
 
@@ -95,7 +108,7 @@ export const buildHomeViewModel = async (rawStoreID: string, rawDate: string): P
         getWooCommerceOrders(dateRef),
         getResume(chartStoreID || "", date),
         getAllPurchaseOrders(),
-        getAllProducts(),
+        getProductsForSale(storeID),
     ])
 
     const wooSales = wooOrders.map(mapWooOrderToSale)

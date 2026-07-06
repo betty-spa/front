@@ -17,6 +17,7 @@ interface DiscountManagementPanelProps {
 }
 
 type DiscountStoreProductRow = DiscountStoreProductOption & {
+    stockQuantity: number
     finalPrice?: number
     discountApplied?: boolean
     activeOffer?: IStoreProduct["activeOffer"]
@@ -77,6 +78,11 @@ const getDiscountTypeLabel = (discountType: string) => {
     return "Precio fijo"
 }
 
+const getStoreProductStock = (storeProduct: IStoreProduct) => {
+    const quantity = Number(storeProduct.quantity)
+    return Number.isFinite(quantity) ? quantity : 0
+}
+
 export function DiscountManagementPanel({ products, offers }: DiscountManagementPanelProps) {
     const router = useRouter()
     const [isModalOpen, setIsModalOpen] = useState(false)
@@ -88,6 +94,9 @@ export function DiscountManagementPanel({ products, offers }: DiscountManagement
         products.forEach((product) => {
             product.ProductVariations.forEach((variation) => {
                 variation.StoreProducts?.forEach((storeProduct) => {
+                    const stockQuantity = getStoreProductStock(storeProduct)
+                    if (stockQuantity <= 0) return
+
                     flattened.push({
                         storeProductID: storeProduct.storeProductID,
                         productName: product.name,
@@ -95,6 +104,7 @@ export function DiscountManagementPanel({ products, offers }: DiscountManagement
                         storeName: storeProduct.Store?.name ?? "",
                         storeID: storeProduct.storeID,
                         priceList: Number(storeProduct.priceListStore) || variation.priceList,
+                        stockQuantity,
                         finalPrice: storeProduct.finalPrice,
                         discountApplied: storeProduct.discountApplied,
                         activeOffer: storeProduct.activeOffer,
@@ -106,17 +116,51 @@ export function DiscountManagementPanel({ products, offers }: DiscountManagement
         return flattened
     }, [products])
 
-    const offerRows = useMemo<DiscountOfferRow[]>(
-        () =>
-            offers.map((offer) => {
-                const storeProduct = getStoreProductRelation(offer)
-                return {
+    const availableStoreProductIDs = useMemo(
+        () => new Set(storeProductOptions.map((option) => option.storeProductID)),
+        [storeProductOptions],
+    )
+
+    const offerRows = useMemo<DiscountOfferRow[]>(() => {
+        const rowsById = new Map<string, DiscountOfferRow>()
+
+        for (const offer of offers) {
+            const storeProduct = getStoreProductRelation(offer)
+            const storeProductID = offer.storeProductID ?? storeProduct?.storeProductID ?? ""
+            if (!availableStoreProductIDs.has(storeProductID)) continue
+
+            const option = storeProductOptions.find((item) => item.storeProductID === storeProductID)
+            rowsById.set(offer.offerID, {
+                offerID: offer.offerID,
+                storeProductID,
+                productName: option?.productName ?? getProductName(offer),
+                variationName: option?.variationName ?? getVariationName(offer),
+                storeName: option?.storeName ?? getStoreName(offer),
+                priceList: option?.priceList ?? storeProduct?.priceList,
+                discountType: offer.discountType,
+                value: offer.value,
+                scope: offer.scope,
+                exclusive: offer.exclusive,
+                isActive: offer.isActive,
+                startDate: offer.startDate,
+                endDate: offer.endDate,
+                createdAt: offer.createdAt,
+            })
+        }
+
+        for (const option of storeProductOptions) {
+            const storeProductOffers = [option.activeOffer, ...(option.specialOffers ?? [])].filter(Boolean)
+
+            for (const offer of storeProductOffers) {
+                if (!offer?.offerID || rowsById.has(offer.offerID)) continue
+
+                rowsById.set(offer.offerID, {
                     offerID: offer.offerID,
-                    storeProductID: offer.storeProductID ?? storeProduct?.storeProductID ?? "",
-                    productName: getProductName(offer),
-                    variationName: getVariationName(offer),
-                    storeName: getStoreName(offer),
-                    priceList: storeProduct?.priceList,
+                    storeProductID: option.storeProductID,
+                    productName: option.productName,
+                    variationName: option.variationName,
+                    storeName: option.storeName,
+                    priceList: option.priceList,
                     discountType: offer.discountType,
                     value: offer.value,
                     scope: offer.scope,
@@ -125,10 +169,12 @@ export function DiscountManagementPanel({ products, offers }: DiscountManagement
                     startDate: offer.startDate,
                     endDate: offer.endDate,
                     createdAt: offer.createdAt,
-                }
-            }),
-        [offers],
-    )
+                })
+            }
+        }
+
+        return Array.from(rowsById.values()).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+    }, [availableStoreProductIDs, offers, storeProductOptions])
 
     const handleOpenModal = (storeProductID?: string, offer?: ISpecialOffer | null) => {
         setInitialStoreProduct(storeProductID)
@@ -162,7 +208,7 @@ export function DiscountManagementPanel({ products, offers }: DiscountManagement
             {storeProductOptions.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/50 p-12 text-center dark:border-slate-800 dark:bg-slate-900/50">
                     <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Ningún producto tiene asignación de tienda aún.
+                        Ningun producto tiene stock disponible para descuentos en esta tienda.
                     </p>
                 </div>
             ) : offerRows.length === 0 ? (
