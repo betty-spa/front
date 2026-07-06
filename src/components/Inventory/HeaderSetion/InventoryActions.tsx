@@ -7,10 +7,16 @@ import type { IRawProduct } from "@/interfaces/products/IRawProduct"
 import { exportInventoryToExcel } from "@/utils/exportInventoryToExcel"
 import { Button } from "@/components/ui/button"
 import { CategoryManagementModal } from "@/components/CategorySection/EditCategory/CategoryManagementModal"
+import { useTienda } from "@/stores/tienda.store"
 
 export default function InventoryActions({ products }: { products: Array<IProduct | IRawProduct> }) {
     const router = useRouter()
+    const { storeSelected } = useTienda()
     const [showCategoryModal, setShowCategoryModal] = useState(false)
+    const createProductRoute = storeSelected?.storeID
+        ? `/home/inventory/create?storeID=${storeSelected.storeID}`
+        : "/home/inventory/create"
+
     const handleDownloadExcel = () => {
         if (!products || products.length === 0) {
             alert("No hay productos para exportar.")
@@ -25,7 +31,7 @@ export default function InventoryActions({ products }: { products: Array<IProduc
                 Administrar Categorías
             </Button>
             <Button
-                onClick={() => router.push("/home/inventory/create")}
+                onClick={() => router.push(createProductRoute)}
                 className="bg-green-600 text-white px-4 py-2 rounded"
             >
                 Crear Producto

@@ -34,7 +34,7 @@ export const inventoryStore = create<InventoryContextWrapper>((set) => ({
     rawProducts: [],
     editingField: null,
     editValue: "",
-    currentPage: 0,
+    currentPage: 1,
     columnFilters: {
         producto: "",
         marca: "",
