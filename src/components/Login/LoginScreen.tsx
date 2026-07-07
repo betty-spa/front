@@ -25,12 +25,21 @@ export default function LoginScreen() {
             />
             <Image
                 aria-hidden="true"
-                src="/brand/two-brands-color.png"
+                src="/brand/two-brands-colorv2.png"
                 alt=""
                 width={296}
                 height={142}
                 priority
-                className="absolute left-8 top-8 hidden opacity-[0.12] grayscale lg:block dark:opacity-[0.07]"
+                className="absolute left-8 top-8 hidden opacity-[0.12] grayscale lg:block dark:hidden"
+            />
+            <Image
+                aria-hidden="true"
+                src="/brand/two-brandsv2.png"
+                alt=""
+                width={296}
+                height={142}
+                priority
+                className="absolute left-8 top-8 hidden opacity-[0.07] dark:lg:block"
             />
             <Image
                 aria-hidden="true"

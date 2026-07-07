@@ -21,13 +21,15 @@ export const PrintOrderView = React.forwardRef<HTMLDivElement, Props>(({ order }
             {/* Header */}
             <div className="flex justify-between items-start mb-8 border-b-2 border-gray-800 pb-6">
                 <div className="flex flex-col">
-                    <img src="/brand/two-brands-color.png" alt="Logo" className="h-16 w-auto object-contain mb-4" />
+                    <img src="/brand/two-brands-colorv2.png" alt="Logo" className="h-16 w-auto object-contain mb-4" />
                     <h1 className="text-3xl font-bold text-gray-900 uppercase tracking-wide">Orden de Compra</h1>
                 </div>
                 <div className="text-right">
                     <div className="mb-2">
                         <span className="block text-xs font-bold text-gray-500 uppercase">Folio</span>
-                        <span className="text-xl font-mono font-bold text-gray-900">#{order.folio || order.orderID?.slice(-8) || "N/A"}</span>
+                        <span className="text-xl font-mono font-bold text-gray-900">
+                            #{order.folio || order.orderID?.slice(-8) || "N/A"}
+                        </span>
                     </div>
                     <div>
                         <span className="block text-xs font-bold text-gray-500 uppercase">Fecha</span>
@@ -85,7 +87,7 @@ export const PrintOrderView = React.forwardRef<HTMLDivElement, Props>(({ order }
                         {order.ProductVariations.map((item) => (
                             <tr key={item.variationID}>
                                 <td className="py-2 px-3 text-gray-800 font-mono">
-                                    {(item.Product?.name || item.product?.name || "Variación")} ({item.sku})
+                                    {item.Product?.name || item.product?.name || "Variación"} ({item.sku})
                                 </td>
                                 <td className="py-2 px-3 text-center text-gray-800">{item.sizeNumber}</td>
                                 <td className="py-2 px-3 text-center text-gray-800 font-medium">
