@@ -60,6 +60,7 @@ export function InventoryTable({ currentItems, handleSaveEdit, handleDeleteProdu
     const storeID = searchParams.get("storeID") || storeSelected?.storeID || null
     const [openSku, setOpenSku] = useState<string | null>(null)
     const [pricingVariation, setPricingVariation] = useState<PricingVariationState>(null)
+    const [revealedCostSku, setRevealedCostSku] = useState<string | null>(null)
     const printBarcodeModal = (sku: string | null) => {
         setOpenSku(sku)
     }
@@ -256,6 +257,8 @@ export function InventoryTable({ currentItems, handleSaveEdit, handleDeleteProdu
                                                         ? "cursor-pointer dark:hover:bg-gray-800 hover:bg-gray-50"
                                                         : ""
                                                 }`}
+                                                onMouseEnter={() => setRevealedCostSku(variation.sku)}
+                                                onMouseLeave={() => setRevealedCostSku(null)}
                                                 onClick={() => {
                                                     if (!isEditable) return
                                                     setEditingField({ sku: variation.sku, field: "priceCost" })
@@ -283,7 +286,11 @@ export function InventoryTable({ currentItems, handleSaveEdit, handleDeleteProdu
                                                         />
                                                     </div>
                                                 ) : (
-                                                    <span className="font-semibold text-sm blur-sm hover:blur-0 transition-[filter] duration-300 ease-out">
+                                                    <span
+                                                        className={`font-semibold text-sm transition-[filter] duration-300 ease-out ${
+                                                            revealedCostSku === variation.sku ? "blur-0" : "blur-sm"
+                                                        }`}
+                                                    >
                                                         ${toPrice(priceCost)}
                                                     </span>
                                                 )}
