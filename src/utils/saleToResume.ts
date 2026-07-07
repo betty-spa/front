@@ -5,6 +5,20 @@ import { getChileDateMeta } from "@/utils/chile-date"
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
+const normalizeText = (value: unknown): string =>
+    String(value ?? "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim()
+
+const isCountableSaleStatus = (status: unknown): boolean => {
+    const normalizedStatus = normalizeText(status)
+    return normalizedStatus === "pagado" || normalizedStatus === "anulado"
+}
+
+const isCashPayment = (paymentType: unknown): boolean => normalizeText(paymentType) === "efectivo"
+
 export const salesToResume = (sales: ISaleResponse[], ref: Date): ISalesResume => {
     const resume: ISalesResume = {
         today: {
@@ -34,22 +48,20 @@ export const salesToResume = (sales: ISaleResponse[], ref: Date): ISalesResume =
     const last7StartDayNumber = refMeta.dayNumber - 6 * DAY_MS
 
     for (const sale of sales) {
-        if (sale.status === "Pagado") continue
+        if (!isCountableSaleStatus(sale.status)) continue
 
         const nulledProducts = getAnulatedProducts(sale)
         const totalNulledAmount = nulledProducts.reduce((acc, p) => acc + p.quantitySold * Number(p.unitPrice), 0)
         const amount = sale.total - totalNulledAmount
 
         // Si el monto resultante es 0 o menor, no la contamos (anulación total)
-        if (amount <= 0 && sale.status === "Anulado") continue
+        if (amount <= 0) continue
 
         const saleDate = new Date(sale.createdAt)
         const saleMeta = getChileDateMeta(saleDate)
 
         const addSale = (period: keyof ISalesResume) => {
-            const isEfectivo = sale.paymentType === "Efectivo"
-            const isWeb = sale.paymentType === "Web"
-            if (isEfectivo) {
+            if (isCashPayment(sale.paymentType)) {
                 resume[period].efectivo.count += 1
                 resume[period].efectivo.amount += amount
             } else {
