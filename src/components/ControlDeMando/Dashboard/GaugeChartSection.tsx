@@ -14,7 +14,7 @@ export default function GaugeChartSection({ resume }: { resume: IResume }) {
             <Card className="dark:bg-gray-800 border-0 shadow-lg">
                 <CardHeader>
                     <CardTitle className="text-center relative dark:text-white text-sm md:text-base">
-                        Ventas totales del presente mes / Meta
+                        Ventas del mes VS Meta
                     </CardTitle>
                 </CardHeader>
 

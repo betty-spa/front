@@ -14,7 +14,7 @@ export default function ResumeRightSideChart({ saleResume }: ResumeRightProps) {
                     <DollarSign />
                 </div>
                 <div>
-                    <p className="text-sm text-gray-500">Ventas de hoy: {periodSummary.today.count}</p>
+                    <p className="text-sm text-gray-500">Depositos bancarios de hoy: {periodSummary.today.count}</p>
                     <p className={`text-sm dark:text-white font-bold`}>
                         $<span className="text-xl">{toPrice(periodSummary.today.total)}</span>
                     </p>

@@ -113,7 +113,7 @@ export default function TotalSalesResumeGraph({ resume, date }: { resume: IResum
     if (user?.role !== Role.Admin && storeSelected?.role !== Role.Admin) return null
     return (
         <div className="flex flex-col items-center dark:bg-gray-800 bg-white p-4 py-5 rounded">
-            <h3 className="text-sm dark:text-gray-500 text-gray-600 mb-2">Ventas totales del presente mes / Meta</h3>
+            <h3 className="text-sm dark:text-gray-500 text-gray-600 mb-2">Ventas del Mes VS Meta</h3>
             <RadialBarChart
                 width={200}
                 height={200}
@@ -151,10 +151,13 @@ export default function TotalSalesResumeGraph({ resume, date }: { resume: IResum
                     className="w-32 mx-auto text-sm text-center"
                 />
             ) : (
-                <p className="text-sm text-gray-500 cursor-pointer hover:underline" onClick={() => {
-                    setMetaInput(meta.toString())
-                    setEditingMeta(true)
-                }}>
+                <p
+                    className="text-sm text-gray-500 cursor-pointer hover:underline"
+                    onClick={() => {
+                        setMetaInput(meta.toString())
+                        setEditingMeta(true)
+                    }}
+                >
                     Meta: ${toPrice(loadingMeta ? 0 : meta)}
                 </p>
             )}

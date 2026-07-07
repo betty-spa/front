@@ -35,12 +35,21 @@ export default function HomeDashboard({
     dateRef,
     date,
 }: HomeDashboardProps) {
+    const monthLabel = new Intl.DateTimeFormat("es-CL", {
+        month: "long",
+        timeZone: "America/Santiago",
+    }).format(dateRef)
+
     return (
         <div className="space-y-6 px-4 py-4 sm:space-y-8 sm:px-6 sm:py-6 md:px-8 lg:space-y-10">
             <div className="flex flex-col flex-wrap items-center justify-between gap-2 sm:flex-row sm:items-start">
                 <FilterControls stores={stores} />
                 <DailyResumeCards salesResume={salesToResume(allSalesForResume, dateRef)} />
             </div>
+
+            <h2 className="px-1 text-lg font-semibold text-slate-800 dark:text-slate-100">
+                Desempeño del mes de {monthLabel}
+            </h2>
 
             <Suspense fallback={<SalesAndResumeSkeleton />}>
                 <Accordion type="single" collapsible className="w-full">

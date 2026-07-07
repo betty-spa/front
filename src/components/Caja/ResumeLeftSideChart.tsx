@@ -13,6 +13,10 @@ interface ResumeLeftProps {
 export default function ResumeLeftSideChart({ saleResume }: ResumeLeftProps) {
     const { user } = useAuth()
     const { storeSelected } = useTienda()
+    const monthlySalesCount = saleResume.periodSummary.month.count
+    const monthlySalesTotal = saleResume.periodSummary.month.total
+    const averageTicket = monthlySalesCount > 0 ? monthlySalesTotal / monthlySalesCount : 0
+
     if (user?.role !== Role.Admin && storeSelected?.role !== Role.Admin) return null
     return (
         <div className="flex flex-col gap-9">
@@ -39,8 +43,8 @@ export default function ResumeLeftSideChart({ saleResume }: ResumeLeftProps) {
                     <FileText />
                 </div>
                 <div>
-                    <p className="text-sm text-gray-500">Facturación mensual</p>
-                    <p className={`text-xl dark:text-white font-bold`}>${toPrice(0)}</p>
+                    <p className="text-sm text-gray-500">Ticket promedio</p>
+                    <p className={`text-xl dark:text-white font-bold`}>${toPrice(averageTicket)}</p>
                 </div>
             </div>
         </div>
