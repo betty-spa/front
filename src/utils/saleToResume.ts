@@ -1,23 +1,41 @@
 import { ISaleResponse } from "@/interfaces/sales/ISale"
-import { ISalesResume } from "@/interfaces/sales/ISalesResume"
+import { ICountAmountResume, ISalesResume } from "@/interfaces/sales/ISalesResume"
 import { getAnulatedProducts } from "@/lib/getAnulatedProducts"
 import { getChileDateMeta } from "@/utils/chile-date"
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-const normalizeText = (value: unknown): string =>
+export const normalizeText = (value: unknown): string =>
     String(value ?? "")
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
         .toLowerCase()
         .trim()
 
-const isCountableSaleStatus = (status: unknown): boolean => {
+export const isCountableSaleStatus = (status: unknown): boolean => {
     const normalizedStatus = normalizeText(status)
     return normalizedStatus === "pagado" || normalizedStatus === "anulado"
 }
 
-const isCashPayment = (paymentType: unknown): boolean => normalizeText(paymentType) === "efectivo"
+export const isCashPayment = (paymentType: unknown): boolean => normalizeText(paymentType) === "efectivo"
+
+export const isDebitOrCreditPayment = (paymentType: unknown): boolean => {
+    const normalizedPaymentType = normalizeText(paymentType)
+    return (
+        normalizedPaymentType.includes("debito") ||
+        normalizedPaymentType.includes("credito") ||
+        normalizedPaymentType.includes("debit") ||
+        normalizedPaymentType.includes("credit") ||
+        normalizedPaymentType.includes("webpay") ||
+        normalizedPaymentType.includes("transbank")
+    )
+}
+
+export const getSaleNetAmount = (sale: ISaleResponse): number => {
+    const nulledProducts = getAnulatedProducts(sale)
+    const totalNulledAmount = nulledProducts.reduce((acc, p) => acc + p.quantitySold * Number(p.unitPrice), 0)
+    return sale.total - totalNulledAmount
+}
 
 export const salesToResume = (sales: ISaleResponse[], ref: Date): ISalesResume => {
     const resume: ISalesResume = {
@@ -50,9 +68,7 @@ export const salesToResume = (sales: ISaleResponse[], ref: Date): ISalesResume =
     for (const sale of sales) {
         if (!isCountableSaleStatus(sale.status)) continue
 
-        const nulledProducts = getAnulatedProducts(sale)
-        const totalNulledAmount = nulledProducts.reduce((acc, p) => acc + p.quantitySold * Number(p.unitPrice), 0)
-        const amount = sale.total - totalNulledAmount
+        const amount = getSaleNetAmount(sale)
 
         // Si el monto resultante es 0 o menor, no la contamos (anulación total)
         if (amount <= 0) continue
@@ -79,4 +95,36 @@ export const salesToResume = (sales: ISaleResponse[], ref: Date): ISalesResume =
     }
 
     return resume
+}
+
+export const salesToBankDepositSummary = (sales: ISaleResponse[], ref: Date): ICountAmountResume => {
+    const summary: ICountAmountResume = { count: 0, amount: 0 }
+    const refMeta = getChileDateMeta(ref)
+    const dayOfWeek = new Date(refMeta.dayNumber).getUTCDay()
+    let startDayNumber = refMeta.dayNumber
+    let endDayNumber = refMeta.dayNumber
+
+    if (dayOfWeek === 1) {
+        startDayNumber = refMeta.dayNumber - 3 * DAY_MS
+        endDayNumber = refMeta.dayNumber - DAY_MS
+    } else if (dayOfWeek === 6) {
+        startDayNumber = refMeta.dayNumber - DAY_MS
+    } else if (dayOfWeek === 0) {
+        startDayNumber = refMeta.dayNumber - 2 * DAY_MS
+    }
+
+    for (const sale of sales) {
+        if (!isCountableSaleStatus(sale.status) || !isDebitOrCreditPayment(sale.paymentType)) continue
+
+        const saleMeta = getChileDateMeta(new Date(sale.createdAt))
+        if (saleMeta.dayNumber < startDayNumber || saleMeta.dayNumber > endDayNumber) continue
+
+        const amount = getSaleNetAmount(sale)
+        if (amount <= 0) continue
+
+        summary.count += 1
+        summary.amount += amount
+    }
+
+    return summary
 }

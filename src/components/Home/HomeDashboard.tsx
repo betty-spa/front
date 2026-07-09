@@ -14,7 +14,7 @@ import { IResume } from "@/interfaces/sales/ISalesResume"
 import { ISaleResponse } from "@/interfaces/sales/ISale"
 import { IPurchaseOrder } from "@/interfaces/orders/IPurchaseOrder"
 import { IProduct } from "@/interfaces/products/IProduct"
-import { salesToResume } from "@/utils/saleToResume"
+import { salesToBankDepositSummary, salesToResume } from "@/utils/saleToResume"
 
 type HomeDashboardProps = {
     stores: IStore[]
@@ -39,12 +39,14 @@ export default function HomeDashboard({
         month: "long",
         timeZone: "America/Santiago",
     }).format(dateRef)
+    const salesResume = salesToResume(allSalesForResume, dateRef)
+    const bankDepositSummary = salesToBankDepositSummary(allSalesForResume, dateRef)
 
     return (
         <div className="space-y-6 px-4 py-4 sm:space-y-8 sm:px-6 sm:py-6 md:px-8 lg:space-y-10">
             <div className="flex flex-col flex-wrap items-center justify-between gap-2 sm:flex-row sm:items-start">
                 <FilterControls stores={stores} />
-                <DailyResumeCards salesResume={salesToResume(allSalesForResume, dateRef)} />
+                <DailyResumeCards salesResume={salesResume} />
             </div>
 
             <h2 className="px-1 text-lg font-semibold text-slate-800 dark:text-slate-100">
@@ -63,7 +65,7 @@ export default function HomeDashboard({
                         <AccordionContent className="block space-y-6 lg:grid lg:grid-cols-3 lg:items-start lg:gap-4 xl:gap-4 lg:space-y-0">
                             <ResumeLeftSideChart saleResume={resume} />
                             <TotalSalesResumeGraph resume={resume} date={date} />
-                            <ResumeRightSideChart saleResume={resume} />
+                            <ResumeRightSideChart saleResume={resume} bankDepositSummary={bankDepositSummary} />
                         </AccordionContent>
                     </AccordionItem>
                 </Accordion>
