@@ -13,6 +13,7 @@ import { motion } from "framer-motion"
 import { MotionItem } from "../Animations/motionItem"
 import { useAuth } from "@/stores/user.store"
 import { Role } from "@/lib/userRoles"
+import { LoaderCircle } from "lucide-react"
 
 import useMobileScreen from "@/hooks/useMobileScreen"
 import useDarkMode from "@/hooks/useDarkMode"
@@ -22,6 +23,7 @@ export default function Sidebar() {
     const router = useRouter()
     const pathname = usePathname()
     const { searchParams, createQueryParam } = useQueryParams()
+    const searchParamsKey = searchParams.toString()
 
     const { user } = useAuth()
     const { storeSelected } = useTienda()
@@ -31,6 +33,11 @@ export default function Sidebar() {
 
     const [isCollapsed, setIsCollapsed] = useState(false)
     const [openSections, setOpenSections] = useState<Record<string, boolean>>({})
+    const [pendingRoute, setPendingRoute] = useState<string | null>(null)
+
+    useEffect(() => {
+        setPendingRoute(null)
+    }, [pathname, searchParamsKey])
 
     useEffect(() => {
         const storeID = searchParams.get("storeID")
@@ -47,8 +54,13 @@ export default function Sidebar() {
     }
 
     const handleNavClick = async (route: string) => {
-        if (!storeSelected) return router.push(route)
-        router.push(`${route}?${createQueryParam("storeID", storeSelected.storeID)}`)
+        const targetRoute = storeSelected ? `${route}?${createQueryParam("storeID", storeSelected.storeID)}` : route
+
+        if (route !== "#" && route !== pathname) {
+            setPendingRoute(route)
+        }
+
+        router.push(targetRoute)
         // Close mobile menu after navigation
         if (isMobile) {
             setIsMobileOpen(false)
@@ -96,6 +108,20 @@ export default function Sidebar() {
     // On mobile: never collapsed when open, always show full content
     // On desktop: use isCollapsed state
     const shouldShowCollapsed = !isMobile && isCollapsed
+
+    const PendingOverlay = () => (
+        <motion.span
+            aria-hidden="true"
+            initial={{ x: "-100%" }}
+            animate={{ x: "100%" }}
+            transition={{
+                duration: 1.1,
+                repeat: Infinity,
+                ease: "easeInOut",
+            }}
+            className="absolute inset-y-0 left-0 w-full bg-white/15"
+        />
+    )
 
     // Mobile overlay
     const MobileOverlay = () => (
@@ -242,20 +268,30 @@ export default function Sidebar() {
                                                         <div className="pl-4 lg:pl-6 space-y-1 overflow-hidden">
                                                             {item.subItems?.map((sub) => {
                                                                 const isSubActive = pathname === sub.route
+                                                                const isSubPending = pendingRoute === sub.route
                                                                 return (
                                                                     <button
                                                                         key={sub.label}
                                                                         onClick={() => handleNavClick(sub.route || "#")}
+                                                                        disabled={isSubPending}
                                                                         className={`flex items-center p-2 w-full text-left text-sm transition-all duration-200 rounded-lg mx-2 relative
                                                                         ${
-                                                                            isSubActive
+                                                                            isSubPending
+                                                                                ? "bg-sky-800 text-white shadow-md cursor-progress overflow-hidden"
+                                                                                : isSubActive
                                                                                 ? "bg-sky-700 text-white shadow-md transform scale-105 border-l-4 border-sky-300"
                                                                                 : "dark:hover:bg-gray-800 hover:bg-sky-700 hover:text-white hover:shadow-sm hover:transform hover:scale-105"
                                                                         }
                                                                     `}
                                                                     >
-                                                                        <span className="truncate font-medium">
-                                                                            {sub.label}
+                                                                        {isSubPending && <PendingOverlay />}
+                                                                        <span className="relative z-10 flex min-w-0 flex-1 items-center gap-2 truncate font-medium">
+                                                                            {isSubPending && (
+                                                                                <LoaderCircle className="h-4 w-4 flex-shrink-0 animate-spin" />
+                                                                            )}
+                                                                            <span className="truncate">
+                                                                                {isSubPending ? "Cargando..." : sub.label}
+                                                                            </span>
                                                                         </span>
                                                                     </button>
                                                                 )
@@ -267,11 +303,19 @@ export default function Sidebar() {
                                                 <MotionItem delay={index}>
                                                     <Tooltip>
                                                         <TooltipTrigger asChild>
+                                                            {(() => {
+                                                                const isItemPending = pendingRoute === item.route
+                                                                return (
                                                             <button
                                                                 onClick={() => handleNavClick(item.route || "#")}
+                                                                disabled={isItemPending}
                                                                 className={`flex items-center w-full cursor-pointer p-2 lg:p-3 transition-all duration-200 group relative
                                                                 ${
-                                                                    isActive
+                                                                    isItemPending
+                                                                        ? shouldShowCollapsed
+                                                                            ? "bg-sky-800 text-white shadow-lg justify-center cursor-progress overflow-hidden"
+                                                                            : "bg-sky-800 text-white shadow-lg border-r-4 border-sky-300 cursor-progress overflow-hidden"
+                                                                        : isActive
                                                                         ? shouldShowCollapsed
                                                                             ? "bg-sky-700 text-white shadow-lg justify-center"
                                                                             : "bg-sky-700 text-white shadow-lg border-r-4 border-sky-300 transform scale-105"
@@ -281,15 +325,24 @@ export default function Sidebar() {
                                                                 }
                                                             `}
                                                             >
-                                                                <span className="text-lg flex-shrink-0">
-                                                                    {<item.icon />}
+                                                                {isItemPending && <PendingOverlay />}
+                                                                <span className="relative z-10 text-lg flex-shrink-0">
+                                                                    {isItemPending ? (
+                                                                        <LoaderCircle className="h-4 w-4 animate-spin" />
+                                                                    ) : (
+                                                                        <item.icon />
+                                                                    )}
                                                                 </span>
                                                                 {!shouldShowCollapsed && (
-                                                                    <span className="ml-3 flex-1 text-left text-sm lg:text-base truncate font-medium">
-                                                                        {item.label}
+                                                                    <span className="relative z-10 ml-3 flex flex-1 truncate text-left text-sm font-medium lg:text-base">
+                                                                        <span className="truncate">
+                                                                            {isItemPending
+                                                                                ? "Cargando..."
+                                                                                : item.label}
+                                                                        </span>
                                                                     </span>
                                                                 )}
-                                                                {isActive && !shouldShowCollapsed && (
+                                                                {isActive && !isItemPending && !shouldShowCollapsed && (
                                                                     <motion.div
                                                                         initial={{ scale: 0 }}
                                                                         animate={{ scale: 1 }}
@@ -297,6 +350,8 @@ export default function Sidebar() {
                                                                     />
                                                                 )}
                                                             </button>
+                                                                )
+                                                            })()}
                                                         </TooltipTrigger>
                                                         {shouldShowCollapsed && (
                                                             <TooltipContent side="right" className="ml-2 z-[9999]">

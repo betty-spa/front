@@ -101,16 +101,22 @@ export const salesToBankDepositSummary = (sales: ISaleResponse[], ref: Date): IC
     const summary: ICountAmountResume = { count: 0, amount: 0 }
     const refMeta = getChileDateMeta(ref)
     const dayOfWeek = new Date(refMeta.dayNumber).getUTCDay()
-    let startDayNumber = refMeta.dayNumber
-    let endDayNumber = refMeta.dayNumber
+    // En un día hábil, el depósito corresponde a las ventas con tarjeta del día anterior.
+    let startDayNumber = refMeta.dayNumber - DAY_MS
+    let endDayNumber = refMeta.dayNumber - DAY_MS
 
     if (dayOfWeek === 1) {
-        startDayNumber = refMeta.dayNumber - 3 * DAY_MS
+        // El lunes se muestra lo que se deposita (jueves) más lo pendiente
+        // del viernes y del fin de semana.
+        startDayNumber = refMeta.dayNumber - 4 * DAY_MS
         endDayNumber = refMeta.dayNumber - DAY_MS
     } else if (dayOfWeek === 6) {
+        // Durante el fin de semana se mantienen visibles las ventas pendientes.
         startDayNumber = refMeta.dayNumber - DAY_MS
+        endDayNumber = refMeta.dayNumber
     } else if (dayOfWeek === 0) {
         startDayNumber = refMeta.dayNumber - 2 * DAY_MS
+        endDayNumber = refMeta.dayNumber
     }
 
     for (const sale of sales) {

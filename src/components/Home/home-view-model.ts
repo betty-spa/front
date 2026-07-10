@@ -1,7 +1,7 @@
 import { getAllProducts } from "@/actions/products/getAllProducts"
 import { getStoreStockSaleProducts } from "@/actions/inventory/getStoreStock"
 import { getAllPurchaseOrders } from "@/actions/purchase-orders/getAllPurchaseOrders"
-import { getSales, getSalesForResume } from "@/actions/sales/getSales"
+import { getSales } from "@/actions/sales/getSales"
 import { getAllStores } from "@/actions/stores/getAllStores"
 import { getResume } from "@/actions/totals/getResume"
 import { getWooCommerceOrders } from "@/actions/woocommerce/getWooOrder"
@@ -9,8 +9,10 @@ import { IStore } from "@/interfaces/stores/IStore"
 import { IPurchaseOrder } from "@/interfaces/orders/IPurchaseOrder"
 import { IResume } from "@/interfaces/sales/ISalesResume"
 import { ISaleResponse } from "@/interfaces/sales/ISale"
-import { getChileYYYYMMDD, isYYYYMMDD, toChileMiddayUTC } from "@/utils/chile-date"
+import { getChileDateMeta, getChileYYYYMMDD, isYYYYMMDD, toChileMiddayUTC } from "@/utils/chile-date"
 import { mapWooOrderToSale } from "@/utils/mappers/woocommerceToSale"
+
+const DAY_MS = 24 * 60 * 60 * 1000
 
 const isSpecialStoreFilter = (storeID: string) => ["all", "propias", "consignadas"].includes(storeID)
 
@@ -45,6 +47,19 @@ const filterSalesByScope = (
     return sales.filter((sale) => {
         const saleStore = storeIndex.get(sale.storeID)
         return saleStore ? matchesStoreScope(storeID, saleStore) : false
+    })
+}
+
+const filterSalesForResume = (sales: ISaleResponse[], refYYYYMMDD: string): ISaleResponse[] => {
+    const refDate = toChileMiddayUTC(refYYYYMMDD)
+    const refMeta = getChileDateMeta(refDate)
+    const last7StartDayNumber = refMeta.dayNumber - 6 * DAY_MS
+
+    return sales.filter((sale) => {
+        const saleMeta = getChileDateMeta(new Date(sale.createdAt))
+        const inLast7 = saleMeta.dayNumber >= last7StartDayNumber && saleMeta.dayNumber <= refMeta.dayNumber
+        const inMonth = saleMeta.year === refMeta.year && saleMeta.month === refMeta.month
+        return inLast7 || inMonth
     })
 }
 
@@ -85,12 +100,6 @@ export type HomeViewModel = {
 }
 
 export const buildHomeViewModel = async (rawStoreID: string, rawDate: string): Promise<HomeViewModel | null> => {
-    const stores = await getAllStores()
-    if (stores.length === 0) {
-        return null
-    }
-    const storeIndex = buildStoreIndex(stores)
-
     if (!rawStoreID) {
         return null
     }
@@ -99,23 +108,38 @@ export const buildHomeViewModel = async (rawStoreID: string, rawDate: string): P
     const date = isYYYYMMDD(rawDate) ? rawDate : getChileYYYYMMDD(new Date())
     const dateRef = toChileMiddayUTC(date)
     const specialFilter = isSpecialStoreFilter(storeID)
-    const chartStoreID = specialFilter ? (stores[0]?.storeID ?? storeID) : storeID
     const apiSalesStoreID = specialFilter ? "" : storeID
 
-    const [sales, dailySales, wooOrders, resume, allOrders, allProducts] = await Promise.all([
-        getSales(apiSalesStoreID || "", date),
-        getSalesForResume(apiSalesStoreID || "", date),
-        getWooCommerceOrders(dateRef),
+    // Estas consultas no dependen entre sí. Iniciarlas antes de esperar las tiendas
+    // evita una cascada de red en la primera carga de Caja.
+    const storesPromise = getAllStores()
+    const salesPromise = getSales(apiSalesStoreID || "")
+    const wooOrdersPromise = getWooCommerceOrders(dateRef)
+    const allOrdersPromise = getAllPurchaseOrders()
+    const allProductsPromise = getProductsForSale(storeID)
+
+    const stores = await storesPromise
+    if (stores.length === 0) {
+        return null
+    }
+
+    const storeIndex = buildStoreIndex(stores)
+    const chartStoreID = specialFilter ? (stores[0]?.storeID ?? storeID) : storeID
+
+    const [salesSource, wooOrders, resume, allOrders, allProducts] = await Promise.all([
+        salesPromise,
+        wooOrdersPromise,
         getResume(chartStoreID || "", date),
-        getAllPurchaseOrders(),
-        getProductsForSale(storeID),
+        allOrdersPromise,
+        allProductsPromise,
     ])
 
     const wooSales = wooOrders.map(mapWooOrderToSale)
-    const tableSales = filterSalesByScope(sales, storeID, storeIndex)
+    const tableSales = filterSalesByScope(salesSource, storeID, storeIndex)
+    const scopedResumeSales = filterSalesForResume(tableSales, date)
     const esCentral = storeID === "all" || storeID === "propias" || storeIndex.get(storeID)?.isCentralStore === true
     const filteredWooSales = esCentral ? wooSales : []
-    const allSalesForResume = [...filterSalesByScope(dailySales, storeID, storeIndex), ...filteredWooSales]
+    const allSalesForResume = [...scopedResumeSales, ...filteredWooSales]
     const purchaseOrders = filterOrdersByScope(allOrders, storeID, storeIndex)
     const items = sortByCreatedAtDesc([...tableSales, ...filteredWooSales, ...purchaseOrders])
 
